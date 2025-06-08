@@ -6,8 +6,9 @@ import pickle
 import json
 from src.folderconstants import *
 from shutil import copyfile
+import zipfile
 
-datasets = ['synthetic', 'SMD', 'SWaT', 'SMAP', 'MSL', 'WADI', 'MSDS', 'UCR', 'MBA', 'NAB']
+datasets = ['synthetic', 'SMD', 'SWaT', 'SMAP', 'MSL', 'WADI', 'MSDS', 'UCR', 'MBA', 'NAB', "KITSUNE_FUZZING"]
 
 wadi_drop = ['2_LS_001_AL', '2_LS_002_AL','2_P_001_STATUS','2_P_002_STATUS']
 
@@ -196,6 +197,47 @@ def load_data(dataset):
 			labels[ls + i, :] = 1
 		for file in ['train', 'test', 'labels']:
 			np.save(os.path.join(folder, f'{file}.npy'), eval(file))
+	elif dataset == "KITSUNE_FUZZING": 
+		dataset_folder = 'data/KITSUNE_FUZZING'
+		# Load zipped data
+		zip_path_data = os.path.join(dataset_folder, 'Fuzzing_dataset.csv.zip')
+		with zipfile.ZipFile(zip_path_data, 'r') as zip_ref:
+			csv_filename = zip_ref.namelist()[0]
+			with zip_ref.open(csv_filename) as csv_file:
+				df = pd.read_csv(csv_file, header=None)
+
+		# Load zipped labels
+		zip_path_label = os.path.join(dataset_folder, 'Fuzzing_labels.csv.zip')
+		with zipfile.ZipFile(zip_path_label, 'r') as zip_ref:
+			csv_filename = zip_ref.namelist()[0]
+			with zip_ref.open(csv_filename) as csv_file:
+				df_labels = pd.read_csv(csv_file, index_col=0)
+
+		# Sample dataset
+		sample = int(0.01 * len(df))
+		df = df.head(sample)
+		df_labels = df_labels.head(sample)
+
+		# Split into train/test 
+		split = int(0.5 * len(df))
+		df_train = df[:split]
+		df_test = df[split:]
+		labels = df_labels.iloc[split:]  # Keep it a DataFrame
+		labels = pd.DataFrame(labels["x"].apply(lambda x: [x]*115).to_list())
+
+		_, min_a, max_a = normalize3(np.concatenate((df_train, df_test), axis=0))
+		train, _, _ = normalize3(df_train, min_a, max_a)
+		test, _, _ = normalize3(df_test, min_a, max_a)
+
+		# Make sure labels are binary and match shape
+		labels = labels.to_numpy().astype(np.float64)
+		assert labels.shape[0] == test.shape[0], "Mismatch in test and label shapes"
+
+		# Save to npy files
+		output_dir = os.path.join(output_folder, 'KITSUNE_FUZZING')
+		os.makedirs(output_dir, exist_ok=True)
+		for file, data in zip(['train', 'test', 'labels'], [train, test, labels]):
+			np.save(os.path.join(output_dir, f'{file}.npy'), data)
 	else:
 		raise Exception(f'Not Implemented. Check one of {datasets}')
 

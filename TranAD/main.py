@@ -304,6 +304,15 @@ def load_optimizer(optimizer_name):
 
 if __name__ == '__main__':
 	train_loader, test_loader, labels = load_dataset(args.dataset)
+	for batch in train_loader:
+		inputs = batch
+		print(f"TRAIN Input batch shape: {inputs.shape}")
+		break  # Remove this if you want to print all batches
+	for batch in test_loader:
+		inputs = batch
+		print(f"TEST Input batch shape: {inputs.shape}")
+		break  # Remove this if you want to print all batches
+	print(labels.shape)
 	if args.model in ['MERLIN']:
 		eval(f'run_{args.model.lower()}(test_loader, labels, args.dataset)')
 	learning_rate = args.learning_rate if args.learning_rate > 0 else lr
@@ -319,7 +328,7 @@ if __name__ == '__main__':
 	### Training phase
 	if not args.test:
 		print(f'{color.HEADER}Training {args.model} on {args.dataset}{color.ENDC}')
-		num_epochs = 5; e = epoch + 1; start = time()
+		num_epochs = 20; e = epoch + 1; start = time()
 		for e in tqdm(list(range(epoch+1, epoch+num_epochs+1))):
 			lossT, lr = backprop(e, model, trainD, trainO, optimizer, scheduler)
 			accuracy_list.append((lossT, lr))
